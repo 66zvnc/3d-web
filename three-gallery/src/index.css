@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #05060a;
+  color: #f5f5f5;
+}
+.page {
+  height: 100%;
+}
+.canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+}
+.content {
+  position: relative;
+  z-index: 1;
+}
+section {
+  min-height: 100vh;
+  padding: 6rem 10vw;
+}
