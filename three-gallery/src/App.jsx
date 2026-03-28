@@ -1,120 +1,176 @@
 import React, { Suspense, useRef, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Environment, useGLTF } from "@react-three/drei";
+import { useGLTF } from "@react-three/drei";
+import * as THREE from "three";
 
-function useScrollProgress() {
-  const ref = useRef(0);
-  useEffect(() => {
-    const onScroll = () => {
-      const h = document.documentElement.scrollHeight - document.documentElement.clientHeight;
-      ref.current = h > 0 ? window.scrollY / h : 0;
-    };
-    onScroll();
-    window.addEventListener("scroll", onScroll);
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-  return ref;
+// Auto-centers and normalizes a scene to fit within a unit sphere
+function normalizeScene(scene) {
+  const box = new THREE.Box3().setFromObject(scene);
+  const center = new THREE.Vector3();
+  const size = new THREE.Vector3();
+  box.getCenter(center);
+  box.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  scene.position.sub(center);
+  scene.scale.setScalar(1.5 / maxDim);
 }
 
-function SpinningModel({ url, position, scale = 0.9, speed = 0.4 }) {
-  const ref = useRef();
-  const { scene } = useGLTF(url);
+function Model({ url, position, rotSpeed = 0.4 }) {
+  const groupRef = useRef();
+  const { scene: rawScene } = useGLTF(url);
+
+  const scene = React.useMemo(() => {
+    const cloned = rawScene.clone(true);
+    normalizeScene(cloned);
+    return cloned;
+  }, [rawScene]);
+
   useFrame((_, delta) => {
-    if (ref.current) ref.current.rotation.y += speed * delta;
+    if (groupRef.current) groupRef.current.rotation.y += rotSpeed * delta;
   });
+
   return (
-    <group ref={ref} position={position} scale={scale}>
+    <group ref={groupRef} position={position}>
       <primitive object={scene} />
     </group>
   );
 }
 
-function Scene({ scrollRef }) {
-  useFrame(({ camera }) => {
-    const t = scrollRef.current;
-    camera.position.set(0, 0.5 - t * 0.5, 6 - t * 1.0);
-    camera.lookAt(0, 0, 0);
-  });
+useGLTF.preload("/models/statue1.glb");
+useGLTF.preload("/models/statue2.glb");
+useGLTF.preload("/models/statue3.glb");
+useGLTF.preload("/models/frame1.glb");
+useGLTF.preload("/models/frame2.glb");
+useGLTF.preload("/models/frame3.glb");
 
+function Scene() {
   return (
     <>
-      <color attach="background" args={["#05060a"]} />
-      <directionalLight position={[4, 6, 5]} intensity={1.4} />
-      <ambientLight intensity={0.9} />
+      <color attach="background" args={["#07080f"]} />
+      <ambientLight intensity={1.2} />
+      <directionalLight position={[5, 8, 5]} intensity={1.5} />
+      <directionalLight position={[-5, 2, -5]} intensity={0.5} />
+
       <Suspense fallback={null}>
-        {/* Statues - centered in viewport */}
-        <SpinningModel url="/models/statue1.glb" position={[-2.2, 0, 0.5]} />
-        <SpinningModel url="/models/statue2.glb" position={[0, 0, 0]} scale={1.0} />
-        <SpinningModel url="/models/statue3.glb" position={[2.2, 0, -0.3]} />
-        {/* Frames - slightly behind and above */}
-        <SpinningModel url="/models/frame1.glb" position={[-2.0, 1.2, -2.2]} />
-        <SpinningModel url="/models/frame2.glb" position={[0, 1.4, -2.6]} />
-        <SpinningModel url="/models/frame3.glb" position={[2.0, 1.2, -2.0]} />
-        <Environment preset="city" />
+        {/* Row 1 - statues spread across center */}
+        <Model url="/models/statue1.glb" position={[-3, 0, 0]} />
+        <Model url="/models/statue2.glb" position={[0, 0, 0]} />
+        <Model url="/models/statue3.glb" position={[3, 0, 0]} />
+
+        {/* Row 2 - frames slightly behind */}
+        <Model url="/models/frame1.glb" position={[-3, 0, -4]} rotSpeed={0.3} />
+        <Model url="/models/frame2.glb" position={[0, 0, -4]} rotSpeed={0.3} />
+        <Model url="/models/frame3.glb" position={[3, 0, -4]} rotSpeed={0.3} />
       </Suspense>
-      <OrbitControls enablePan={false} enableZoom={false} enableRotate={false} />
     </>
   );
 }
 
 export default function App() {
-  const scrollRef = useScrollProgress();
-
   return (
-    <div className="relative min-h-screen w-screen overflow-x-hidden bg-[#05060a] text-slate-50">
-      {/* Fixed 3D canvas behind everything */}
+    <div style={{ width: "100vw", minHeight: "100vh", background: "#07080f", color: "#f8f8f8" }}>
+      {/* Fixed full-screen canvas */}
       <Canvas
-        style={{ position: "fixed", top: 0, left: 0, width: "100%", height: "100%", zIndex: 0 }}
-        camera={{ fov: 45, position: [0, 0.5, 6] }}
+        style={{
+          position: "fixed",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          zIndex: 0,
+        }}
+        camera={{ fov: 70, position: [0, 0, 8], near: 0.1, far: 100 }}
       >
-        <Scene scrollRef={scrollRef} />
+        <Scene />
       </Canvas>
 
-      {/* Scrollable content on top */}
-      <main style={{ position: "relative", zIndex: 10 }}>
+      {/* Scrollable HTML content */}
+      <div style={{ position: "relative", zIndex: 10 }}>
         {/* Hero */}
-        <section className="min-h-screen flex items-center px-6 md:px-20 lg:px-36">
-          <div className="max-w-2xl space-y-6">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Gallery Pro</p>
-            <h1 className="text-4xl md:text-6xl font-semibold leading-tight">
+        <section
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            padding: "0 6rem",
+          }}
+        >
+          <div style={{ maxWidth: 520 }}>
+            <p style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 16 }}>
+              Gallery Pro
+            </p>
+            <h1 style={{ fontSize: "clamp(2rem, 5vw, 4rem)", fontWeight: 600, lineHeight: 1.2, marginBottom: 20 }}>
               Always curate like a pro.
             </h1>
-            <p className="text-sm md:text-base text-slate-300">
+            <p style={{ fontSize: 15, color: "#d1d5db", lineHeight: 1.7, marginBottom: 28 }}>
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Blazing fast visuals,
-              incredible detail preservation, and immersive depth that showcases every sculpture and frame.
+              incredible detail preservation, and immersive depth.
             </p>
-            <button className="mt-4 inline-flex items-center rounded-full bg-red-500 px-6 py-3 text-sm font-medium text-white shadow-md hover:bg-red-600 transition">
+            <button
+              style={{
+                background: "#ef4444",
+                color: "#fff",
+                border: "none",
+                borderRadius: 999,
+                padding: "12px 28px",
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
               Know more
             </button>
           </div>
         </section>
 
         {/* Sculptures */}
-        <section className="min-h-screen flex items-center px-6 md:px-20 lg:px-36">
-          <div className="max-w-xl space-y-4">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Sculptures</p>
-            <h2 className="text-2xl md:text-3xl font-semibold">Sculpted forms in constant motion.</h2>
-            <p className="text-sm md:text-base text-slate-300">
+        <section
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            padding: "0 6rem",
+          }}
+        >
+          <div style={{ maxWidth: 480 }}>
+            <p style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 16 }}>
+              Sculptures
+            </p>
+            <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)", fontWeight: 600, marginBottom: 16 }}>
+              Sculpted forms in constant motion.
+            </h2>
+            <p style={{ fontSize: 15, color: "#d1d5db", lineHeight: 1.7 }}>
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer tincidunt,
-              ipsum in convallis auctor, turpis ipsum pulvinar lectus, vitae feugiat velit nulla non purus.
+              ipsum in convallis auctor, turpis ipsum pulvinar lectus.
             </p>
           </div>
         </section>
 
         {/* Frames */}
-        <section className="min-h-screen flex items-center justify-end px-6 md:px-20 lg:px-36 pb-20">
-          <div className="max-w-xl space-y-4 text-right">
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Frames</p>
-            <h2 className="text-2xl md:text-3xl font-semibold">Stories floating around the gallery.</h2>
-            <p className="text-sm md:text-base text-slate-300">
+        <section
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "flex-end",
+            padding: "0 6rem",
+          }}
+        >
+          <div style={{ maxWidth: 480, textAlign: "right" }}>
+            <p style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 16 }}>
+              Frames
+            </p>
+            <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)", fontWeight: 600, marginBottom: 16 }}>
+              Stories floating around the gallery.
+            </h2>
+            <p style={{ fontSize: 15, color: "#d1d5db", lineHeight: 1.7 }}>
               Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus volutpat,
-              urna eget venenatis convallis, ex augue consequat orci, non tincidunt lectus justo et ante.
+              urna eget venenatis convallis, ex augue consequat orci.
             </p>
           </div>
         </section>
 
-        <section className="min-h-[40vh]" />
-      </main>
+        <section style={{ minHeight: "50vh" }} />
+      </div>
     </div>
   );
 }
