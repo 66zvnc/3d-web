@@ -14,13 +14,11 @@ const URLS = [
 const N = URLS.length;
 URLS.forEach((u) => useGLTF.preload(u));
 
-function useScrollProgress() {
+// Raw scrollY in pixels
+function useScrollY() {
   const ref = useRef(0);
   useEffect(() => {
-    const fn = () => {
-      const h = document.documentElement.scrollHeight - window.innerHeight;
-      ref.current = h > 0 ? window.scrollY / h : 0;
-    };
+    const fn = () => { ref.current = window.scrollY; };
     fn();
     window.addEventListener("scroll", fn, { passive: true });
     return () => window.removeEventListener("scroll", fn);
@@ -40,7 +38,9 @@ function normalizeScene(scene) {
   scene.scale.setScalar(2.2 / m);
 }
 
-function Model({ url, index, scrollRef }) {
+const VH = () => window.innerHeight;
+
+function Model({ url, index, scrollYRef }) {
   const groupRef = useRef();
   const rotY = useRef(0);
   const { scene: raw } = useGLTF(url);
@@ -55,26 +55,39 @@ function Model({ url, index, scrollRef }) {
     const g = groupRef.current;
     if (!g) return;
 
-    const t = scrollRef.current;       // 0-1 total scroll
-    const slot = t * N;                // 0-6 float
-    const entry = Math.max(0, Math.min(1, slot - index + 0.6));
-    const exit  = Math.max(0, Math.min(1, slot - index - 0.6));
-    const opacity = Math.max(0, entry - exit);
+    // Each section is 100vh. Section i starts at i * vh.
+    const vh = VH();
+    const scrollY = scrollYRef.current;
+    // How far into this section are we? -1 = not yet, 0 = entering, 1 = leaving
+    const rel = (scrollY - index * vh) / vh; // -1 to N
 
-    rotY.current += delta * 0.4;
-    g.rotation.y = rotY.current + entry * Math.PI * 0.4;
+    // entry: 0 when rel=-0.5, 1 when rel=0
+    const entry = Math.max(0, Math.min(1, rel + 0.5)) ;   // 0..1 as we enter
+    // exit:  0 when rel=0.5, 1 when rel=1
+    const exit  = Math.max(0, Math.min(1, (rel - 0.5) * 2)); // 0..1 as we leave
+    const opacity = Math.max(0, Math.min(1, entry - exit));
 
-    const sc = 0.3 + entry * 0.7 - exit * 0.5;
+    // continuous spin
+    rotY.current += delta * 0.45;
+    g.rotation.y = rotY.current;
+
+    // position: start below center (y=-3), rise to center (y=0), exit above (y=+3)
+    const yPos = (1 - entry) * -3 + exit * 3;
+    g.position.set(0, yPos, 0);
+
+    // scale: 0.5 -> 1 on entry
+    const sc = 0.5 + entry * 0.5 - exit * 0.3;
     g.scale.setScalar(Math.max(0.01, sc));
-    g.position.set(0, (entry - 1) * 2 + exit * 3, 0);
 
+    // opacity
     g.traverse((obj) => {
       if (!obj.isMesh) return;
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       mats.forEach((m) => {
         m.transparent = true;
-        m.opacity = Math.max(0, Math.min(1, opacity));
+        m.opacity = opacity;
         m.depthWrite = opacity > 0.9;
+        m.needsUpdate = true;
       });
     });
   });
@@ -86,7 +99,7 @@ function Model({ url, index, scrollRef }) {
   );
 }
 
-function Scene({ scrollRef }) {
+function Scene({ scrollYRef }) {
   return (
     <>
       <color attach="background" args={["#07080f"]} />
@@ -95,7 +108,7 @@ function Scene({ scrollRef }) {
       <directionalLight position={[-4, 2, -4]} intensity={0.8} />
       <Suspense fallback={null}>
         {URLS.map((url, i) => (
-          <Model key={url} url={url} index={i} scrollRef={scrollRef} />
+          <Model key={url} url={url} index={i} scrollYRef={scrollYRef} />
         ))}
       </Suspense>
     </>
@@ -103,24 +116,24 @@ function Scene({ scrollRef }) {
 }
 
 const SECTIONS = [
-  { label: "Statue I",   title: "Always curate like a pro.",           body: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Blazing fast visuals and immersive depth." },
-  { label: "Statue II",  title: "Sculpted forms in constant motion.",   body: "Integer tincidunt, ipsum in convallis auctor, turpis ipsum pulvinar lectus, vitae feugiat velit." },
-  { label: "Statue III", title: "Power carved from stone and light.",    body: "Curabitur tempus, ligula at ultrices finibus, arcu nisl gravida justo, id cursus mi nisi." },
-  { label: "Frame I",    title: "Stories captured on canvas.",           body: "Vivamus volutpat, urna eget venenatis convallis, ex augue consequat orci, non tincidunt lectus." },
-  { label: "Frame II",   title: "Every brushstroke tells a tale.",       body: "Sed euismod, augue in interdum pharetra, risus arcu pretium lectus, eget lobortis eros." },
-  { label: "Frame III",  title: "The gallery never sleeps.",             body: "Nunc sed erat porttitor, faucibus nisi a, tincidunt nunc. Cras rhoncus dapibus dui." },
+  { label: "Statue I",   title: "Always curate like a pro.",         body: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Blazing fast visuals and immersive depth that showcases every sculpture." },
+  { label: "Statue II",  title: "Sculpted forms in constant motion.", body: "Integer tincidunt, ipsum in convallis auctor, turpis ipsum pulvinar lectus, vitae feugiat velit nulla non purus." },
+  { label: "Statue III", title: "Power carved from stone and light.",  body: "Curabitur tempus, ligula at ultrices finibus, arcu nisl gravida justo, id cursus mi nisi in nisl." },
+  { label: "Frame I",    title: "Stories captured on canvas.",         body: "Vivamus volutpat, urna eget venenatis convallis, ex augue consequat orci, non tincidunt lectus justo et ante." },
+  { label: "Frame II",   title: "Every brushstroke tells a tale.",     body: "Sed euismod, augue in interdum pharetra, risus arcu pretium lectus, eget lobortis eros enim a dolor." },
+  { label: "Frame III",  title: "The gallery never sleeps.",           body: "Nunc sed erat porttitor, faucibus nisi a, tincidunt nunc. Cras rhoncus dapibus dui, vitae ultricies elit." },
 ];
 
 export default function App() {
-  const scrollRef = useScrollProgress();
+  const scrollYRef = useScrollY();
 
   return (
     <div style={{ width: "100vw", background: "#07080f", color: "#f8f8f8" }}>
       <Canvas
         style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0 }}
-        camera={{ fov: 60, position: [0, 0, 5], near: 0.1, far: 100 }}
+        camera={{ fov: 55, position: [0, 0, 5], near: 0.1, far: 100 }}
       >
-        <Scene scrollRef={scrollRef} />
+        <Scene scrollYRef={scrollYRef} />
       </Canvas>
 
       <div style={{ position: "relative", zIndex: 10 }}>
@@ -128,10 +141,10 @@ export default function App() {
           <section
             key={i}
             style={{
-              minHeight: "100vh",
+              height: "100vh",
               display: "flex",
               alignItems: "center",
-              padding: "0 5rem",
+              padding: "0 6rem",
               justifyContent: i % 2 === 0 ? "flex-start" : "flex-end",
             }}
           >
@@ -139,7 +152,7 @@ export default function App() {
               <p style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: "#6b7280", marginBottom: 14 }}>
                 {s.label}
               </p>
-              <h2 style={{ fontSize: "clamp(1.6rem, 3.5vw, 3rem)", fontWeight: 700, lineHeight: 1.15, marginBottom: 18 }}>
+              <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 3.2rem)", fontWeight: 700, lineHeight: 1.12, marginBottom: 18 }}>
                 {s.title}
               </h2>
               <p style={{ fontSize: 15, color: "#9ca3af", lineHeight: 1.8, marginBottom: 28 }}>
@@ -153,12 +166,12 @@ export default function App() {
             </div>
           </section>
         ))}
-        <section style={{ minHeight: "50vh" }} />
+        <section style={{ height: "100vh" }} />
       </div>
 
-      <div style={{ position: "fixed", bottom: 32, left: "50%", transform: "translateX(-50%)", zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, color: "#4b5563", fontSize: 11, letterSpacing: "0.2em", pointerEvents: "none" }}>
+      <div style={{ position: "fixed", bottom: 28, left: "50%", transform: "translateX(-50%)", zIndex: 20, display: "flex", flexDirection: "column", alignItems: "center", gap: 6, color: "#374151", fontSize: 10, letterSpacing: "0.25em", pointerEvents: "none" }}>
         <span>SCROLL</span>
-        <div style={{ width: 1, height: 36, background: "#374151" }} />
+        <div style={{ width: 1, height: 32, background: "#374151" }} />
       </div>
     </div>
   );
