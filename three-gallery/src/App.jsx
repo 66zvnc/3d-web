@@ -1,8 +1,9 @@
-import React, { Suspense, useRef, useEffect, useMemo } from "react";
+import React, { Suspense, useRef, useEffect, useMemo, useState } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 
+// ─── scroll tracker ───────────────────────────────────────────────
 function useScrollProgress() {
   const ref = useRef(0);
   useEffect(() => {
@@ -17,166 +18,259 @@ function useScrollProgress() {
   return ref;
 }
 
+// ─── normalize GLB to ~2 units tall, centered ──────────────────────
 function normalizeScene(scene) {
   const box = new THREE.Box3().setFromObject(scene);
   const center = new THREE.Vector3();
-  const size = new THREE.Vector3();
+  const size   = new THREE.Vector3();
   box.getCenter(center);
   box.getSize(size);
   const maxDim = Math.max(size.x, size.y, size.z);
   if (maxDim === 0) return;
   scene.position.sub(center);
-  scene.scale.setScalar(1.8 / maxDim);
+  scene.scale.setScalar(2.2 / maxDim);
 }
 
-function smoothstep(edge0, edge1, x) {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
+// ─── easing ───────────────────────────────────────────────────────
+const lerp = (a, b, t) => a + (b - a) * t;
 
-function Model({ url, position, rotSpeed = 0.4, triggerAt = 0, scrollRef }) {
+// ─── single model slot ────────────────────────────────────────────
+// visibleProgress 0→1: fades/scales in
+// exitProgress   0→1: fades/scales out upward
+function ModelSlot({ url, visibleProgress, exitProgress }) {
   const groupRef = useRef();
-  const alphaRef = useRef(triggerAt === 0 ? 0.001 : 0);
-  const { scene: rawScene } = useGLTF(url);
+  const rotRef   = useRef(0);
+  const { scene: raw } = useGLTF(url);
 
   const scene = useMemo(() => {
-    const cloned = rawScene.clone(true);
-    normalizeScene(cloned);
-    return cloned;
-  }, [rawScene]);
+    const c = raw.clone(true);
+    normalizeScene(c);
+    return c;
+  }, [raw]);
 
   useFrame((_, delta) => {
-    const t = scrollRef.current;
-    // Models with triggerAt=0 appear immediately without needing scroll
-    const scrollVal = triggerAt === 0 ? Math.max(t, 0.001) : t;
-    const progress = smoothstep(triggerAt, triggerAt + 0.15, scrollVal);
-    alphaRef.current += (progress - alphaRef.current) * 0.06;
-    const a = alphaRef.current;
-
     const g = groupRef.current;
     if (!g) return;
 
-    g.rotation.y += rotSpeed * delta;
-    g.scale.setScalar(Math.max(0.01, a));
-    g.position.set(position[0], position[1] - (1 - a) * 3, position[2]);
+    // continuous slow spin
+    rotRef.current += delta * 0.35;
+    // extra rotation driven by scroll entry
+    const entryRot = visibleProgress * Math.PI * 0.5;
+    g.rotation.y = rotRef.current + entryRot;
+
+    // entry: rise from below + scale up + fade in
+    const entryY     = lerp(-3, 0, visibleProgress);
+    const entryScale = lerp(0.4, 1, visibleProgress);
+    // exit: float upward + shrink + fade out
+    const exitY     = lerp(0, 3, exitProgress);
+    const exitScale = lerp(1, 0.4, exitProgress);
+    const opacity   = visibleProgress * (1 - exitProgress);
+
+    g.position.set(0, entryY + exitY, 0);
+    g.scale.setScalar(entryScale * exitScale);
 
     g.traverse((obj) => {
-      if (obj.isMesh && obj.material) {
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        mats.forEach((m) => {
-          m.transparent = true;
-          m.opacity = a;
-          m.depthWrite = a > 0.9;
-        });
-      }
+      if (!obj.isMesh || !obj.material) return;
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach((m) => {
+        m.transparent = true;
+        m.opacity = Math.max(0, Math.min(1, opacity));
+        m.depthWrite = opacity > 0.8;
+      });
     });
   });
 
   return (
-    <group ref={groupRef} position={[position[0], position[1] - 3, position[2]]}>
+    <group ref={groupRef} position={[0, -3, 0]}>
       <primitive object={scene} />
     </group>
   );
 }
 
-useGLTF.preload("/models/statue1.glb");
-useGLTF.preload("/models/statue2.glb");
-useGLTF.preload("/models/statue3.glb");
-useGLTF.preload("/models/frame1.glb");
-useGLTF.preload("/models/frame2.glb");
-useGLTF.preload("/models/frame3.glb");
+// ─── preload ──────────────────────────────────────────────────────
+const MODELS = [
+  "/models/statue1.glb",
+  "/models/statue2.glb",
+  "/models/statue3.glb",
+  "/models/frame1.glb",
+  "/models/frame2.glb",
+  "/models/frame3.glb",
+];
+MODELS.forEach((url) => useGLTF.preload(url));
 
-// Spinning pink cube — confirms canvas is working while models load
-function DebugCube() {
-  const ref = useRef();
-  useFrame((_, delta) => {
-    if (ref.current) ref.current.rotation.y += delta;
-  });
-  return (
-    <mesh ref={ref} position={[0, 0, 0]}>
-      <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="hotpink" />
-    </mesh>
-  );
-}
-
+// ─── scene ────────────────────────────────────────────────────────
 function Scene({ scrollRef }) {
+  const vpRef  = useRef(new Array(MODELS.length).fill(0));
+  const epRef  = useRef(new Array(MODELS.length).fill(0));
+  const [, forceUpdate] = useState(0);
+
+  // Each model occupies 1/N of total scroll
+  const N = MODELS.length;
+
+  useFrame(() => {
+    const t = scrollRef.current; // 0–1
+    const slot = t * N;           // 0–N float
+
+    for (let i = 0; i < N; i++) {
+      // entry: how far into this slot we are (0→1)
+      const entry = Math.max(0, Math.min(1, slot - i + 0.5));
+      // exit: how far past this slot we are (0→1)
+      const exit  = Math.max(0, Math.min(1, slot - i - 0.5));
+      vpRef.current[i] = entry;
+      epRef.current[i] = exit;
+    }
+  });
+
   return (
     <>
       <color attach="background" args={["#07080f"]} />
-      <ambientLight intensity={1.5} />
-      <directionalLight position={[5, 8, 5]} intensity={2} />
-      <directionalLight position={[-5, 2, -5]} intensity={1} />
-
-      {/* Always-visible debug cube in center — remove once models confirmed working */}
-      <DebugCube />
+      <ambientLight intensity={1.4} />
+      <directionalLight position={[4, 6, 4]}  intensity={1.8} />
+      <directionalLight position={[-4, 2, -4]} intensity={0.6} />
 
       <Suspense fallback={null}>
-        {/* Statues: triggerAt=0 means they start appearing immediately */}
-        <Model url="/models/statue1.glb" position={[-5, 0, 0]}  triggerAt={0}    scrollRef={scrollRef} rotSpeed={0.5} />
-        <Model url="/models/statue2.glb" position={[ 0, 0, 0]}  triggerAt={0}    scrollRef={scrollRef} rotSpeed={0.4} />
-        <Model url="/models/statue3.glb" position={[ 5, 0, 0]}  triggerAt={0.1}  scrollRef={scrollRef} rotSpeed={0.45} />
-
-        {/* Frames: appear on scroll */}
-        <Model url="/models/frame1.glb" position={[-5, 0, -3]}  triggerAt={0.35} scrollRef={scrollRef} rotSpeed={0.3} />
-        <Model url="/models/frame2.glb" position={[ 0, 0, -3]}  triggerAt={0.45} scrollRef={scrollRef} rotSpeed={0.25} />
-        <Model url="/models/frame3.glb" position={[ 5, 0, -3]}  triggerAt={0.55} scrollRef={scrollRef} rotSpeed={0.35} />
+        {MODELS.map((url, i) => (
+          <ModelSlot
+            key={url}
+            url={url}
+            visibleProgress={vpRef.current[i]}
+            exitProgress={epRef.current[i]}
+          />
+        ))}
       </Suspense>
     </>
   );
 }
 
+// ─── sections ─────────────────────────────────────────────────────
+const SECTIONS = [
+  {
+    label: "Statue I",
+    title: "Always curate like a pro.",
+    body:  "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Blazing fast visuals, incredible detail preservation, and immersive depth.",
+  },
+  {
+    label: "Statue II",
+    title: "Sculpted forms in constant motion.",
+    body:  "Integer tincidunt, ipsum in convallis auctor, turpis ipsum pulvinar lectus, vitae feugiat velit nulla non purus.",
+  },
+  {
+    label: "Statue III",
+    title: "Power carved from stone and light.",
+    body:  "Curabitur tempus, ligula at ultrices finibus, arcu nisl gravida justo, id cursus mi nisi in nisl.",
+  },
+  {
+    label: "Frame I",
+    title: "Stories captured on canvas.",
+    body:  "Vivamus volutpat, urna eget venenatis convallis, ex augue consequat orci, non tincidunt lectus justo et ante.",
+  },
+  {
+    label: "Frame II",
+    title: "Every brushstroke tells a tale.",
+    body:  "Sed euismod, augue in interdum pharetra, risus arcu pretium lectus, eget lobortis eros enim a dolor.",
+  },
+  {
+    label: "Frame III",
+    title: "The gallery never sleeps.",
+    body:  "Nunc sed erat porttitor, faucibus nisi a, tincidunt nunc. Cras rhoncus dapibus dui, vitae ultricies elit.",
+  },
+];
+
+// ─── app ──────────────────────────────────────────────────────────
 export default function App() {
   const scrollRef = useScrollProgress();
 
   return (
-    <div style={{ width: "100vw", minHeight: "300vh", background: "#07080f", color: "#f8f8f8" }}>
+    <div style={{ width: "100vw", background: "#07080f", color: "#f8f8f8" }}>
+      {/* Fixed canvas */}
       <Canvas
         style={{ position: "fixed", inset: 0, width: "100%", height: "100%", zIndex: 0 }}
-        camera={{ fov: 70, position: [0, 0, 9], near: 0.1, far: 100 }}
+        camera={{ fov: 60, position: [0, 0, 5], near: 0.1, far: 100 }}
       >
         <Scene scrollRef={scrollRef} />
       </Canvas>
 
+      {/* Scrollable sections — each 100vh tall */}
       <div style={{ position: "relative", zIndex: 10 }}>
-        <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", padding: "0 5rem" }}>
-          <div style={{ maxWidth: 500 }}>
-            <p style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 14 }}>Gallery Pro</p>
-            <h1 style={{ fontSize: "clamp(2rem, 5vw, 4rem)", fontWeight: 700, lineHeight: 1.15, marginBottom: 18 }}>
-              Always curate<br />like a pro.
-            </h1>
-            <p style={{ fontSize: 15, color: "#d1d5db", lineHeight: 1.75, marginBottom: 28, maxWidth: 420 }}>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Blazing fast visuals,
-              incredible detail preservation, and immersive depth.
-            </p>
-            <button style={{ background: "#ef4444", color: "#fff", border: "none", borderRadius: 999, padding: "12px 28px", fontSize: 14, fontWeight: 500, cursor: "pointer" }}>
-              Know more
-            </button>
-            <p style={{ marginTop: 60, fontSize: 12, color: "#6b7280", letterSpacing: "0.2em" }}>↓ scroll to explore</p>
-          </div>
-        </section>
+        {SECTIONS.map((s, i) => (
+          <section
+            key={i}
+            style={{
+              minHeight: "100vh",
+              display: "flex",
+              alignItems: "center",
+              padding: "0 5rem",
+              // alternate text left/right
+              justifyContent: i % 2 === 0 ? "flex-start" : "flex-end",
+            }}
+          >
+            <div style={{ maxWidth: 420 }}>
+              <p style={{
+                fontSize: 11,
+                letterSpacing: "0.3em",
+                textTransform: "uppercase",
+                color: "#6b7280",
+                marginBottom: 14,
+              }}>
+                {s.label}
+              </p>
+              <h2 style={{
+                fontSize: "clamp(1.6rem, 3.5vw, 3rem)",
+                fontWeight: 700,
+                lineHeight: 1.15,
+                marginBottom: 18,
+              }}>
+                {s.title}
+              </h2>
+              <p style={{
+                fontSize: 15,
+                color: "#9ca3af",
+                lineHeight: 1.8,
+                marginBottom: 28,
+              }}>
+                {s.body}
+              </p>
+              {i === 0 && (
+                <button style={{
+                  background: "#ef4444",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 999,
+                  padding: "12px 28px",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}>
+                  Explore collection
+                </button>
+              )}
+            </div>
+          </section>
+        ))}
 
-        <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", padding: "0 5rem" }}>
-          <div style={{ maxWidth: 460 }}>
-            <p style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 14 }}>Sculptures</p>
-            <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)", fontWeight: 600, marginBottom: 16 }}>Sculpted forms in constant motion.</h2>
-            <p style={{ fontSize: 15, color: "#d1d5db", lineHeight: 1.75 }}>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer tincidunt,
-              ipsum in convallis auctor, turpis ipsum pulvinar lectus.
-            </p>
-          </div>
-        </section>
+        {/* Extra scroll room at end */}
+        <section style={{ minHeight: "50vh" }} />
+      </div>
 
-        <section style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "0 5rem" }}>
-          <div style={{ maxWidth: 460, textAlign: "right" }}>
-            <p style={{ fontSize: 11, letterSpacing: "0.3em", textTransform: "uppercase", color: "#9ca3af", marginBottom: 14 }}>Frames</p>
-            <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.5rem)", fontWeight: 600, marginBottom: 16 }}>Stories floating around the gallery.</h2>
-            <p style={{ fontSize: 15, color: "#d1d5db", lineHeight: 1.75 }}>
-              Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vivamus volutpat,
-              urna eget venenatis convallis, ex augue consequat orci.
-            </p>
-          </div>
-        </section>
+      {/* Scroll indicator */}
+      <div style={{
+        position: "fixed",
+        bottom: 32,
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 20,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 6,
+        color: "#4b5563",
+        fontSize: 11,
+        letterSpacing: "0.2em",
+        textTransform: "uppercase",
+        pointerEvents: "none",
+      }}>
+        <span>Scroll</span>
+        <div style={{ width: 1, height: 40, background: "#374151" }} />
       </div>
     </div>
   );
