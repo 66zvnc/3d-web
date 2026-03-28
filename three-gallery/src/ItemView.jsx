@@ -81,7 +81,6 @@ export default function ItemView({ itemId, onBack }) {
             background: "transparent", border: "1px solid #2a2b3a",
             color: "#9ca3af", borderRadius: 999, padding: "8px 18px",
             fontSize: 12, cursor: "pointer", letterSpacing: "0.1em",
-            display: "flex", alignItems: "center", gap: 8,
           }}
         >
           ← Back to Gallery
@@ -97,7 +96,6 @@ export default function ItemView({ itemId, onBack }) {
           {item.description}
         </p>
 
-        {/* Metadata grid */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px 24px", marginBottom: 36 }}>
           {[
             ["Year", item.year],
@@ -124,7 +122,6 @@ export default function ItemView({ itemId, onBack }) {
 
       {/* RIGHT — 3D model */}
       <div style={{ flex: 1, position: "relative" }}>
-        {/* Subtle radial glow behind model */}
         <div style={{
           position: "absolute", inset: 0, zIndex: 0,
           background: "radial-gradient(ellipse at center, rgba(239,68,68,0.07) 0%, transparent 70%)",
@@ -141,17 +138,16 @@ export default function ItemView({ itemId, onBack }) {
           <directionalLight position={[-4, 2, -4]} intensity={0.6} />
           <Suspense fallback={null}>
             <SpinningModel key={item.modelUrl} url={item.modelUrl} />
-            <Environment preset="museum" />
+            <Environment preset="city" />
           </Suspense>
         </Canvas>
 
-        {/* Model label overlay */}
         <div style={{
           position: "absolute", bottom: 24, right: 28, zIndex: 10,
           color: "#374151", fontSize: 10, letterSpacing: "0.25em",
           textTransform: "uppercase", pointerEvents: "none",
         }}>
-          Drag to rotate
+          3D Model
         </div>
       </div>
     </div>
