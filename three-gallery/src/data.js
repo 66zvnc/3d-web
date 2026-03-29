@@ -9,8 +9,8 @@ export const ITEMS = [
     description: "A dynamic bronze figure caught mid-stride, embodying speed and athletic grace. The intricate surface detailing reveals the sculptor's mastery of human anatomy in motion. Originally discovered in the ruins of a Roman bathhouse, this piece has become one of the gallery's most prized acquisitions.",
     price: "€ 24,000",
     modelUrl: "/models/statue1.glb",
-    // polar (phi) and azimuthal (theta) angles in the panorama sphere
-    hotspot: { phi: 1.5, theta: 0.4 },
+    // Center of panorama — pedestal visible just right of middle
+    hotspot: { phi: 1.6, theta: -0.3 },
   },
   {
     id: "statue2",
@@ -22,7 +22,8 @@ export const ITEMS = [
     description: "Carved from the same quarry that supplied Michelangelo, this bust captures a pensive figure lost in contemplation. The smooth marble surface transitions seamlessly from polished face to rough-hewn base, a deliberate juxtaposition of refinement and raw nature.",
     price: "€ 58,000",
     modelUrl: "/models/statue2.glb",
-    hotspot: { phi: 1.5, theta: 1.6 },
+    // Far left wall with arch niches
+    hotspot: { phi: 1.5, theta: -2.5 },
   },
   {
     id: "statue3",
@@ -34,7 +35,8 @@ export const ITEMS = [
     description: "Standing nearly a metre tall, The Sentinel commands its space with quiet authority. Cast iron was chosen for its raw industrial quality, contrasting with the classical subject matter. The green patina was achieved through a 14-month outdoor weathering process before the piece entered the collection.",
     price: "€ 31,500",
     modelUrl: "/models/statue3.glb",
-    hotspot: { phi: 1.5, theta: 3.0 },
+    // Center-left near the hanging paintings wall
+    hotspot: { phi: 1.55, theta: -0.8 },
   },
   {
     id: "frame1",
@@ -46,7 +48,8 @@ export const ITEMS = [
     description: "Painted during the artist's summer residency on the Normandy coast, this luminous seascape captures the fleeting quality of afternoon light on water. The gilded frame, original to the work, features hand-carved acanthus leaf motifs. Exhibited at the Paris Salon of 1888.",
     price: "€ 42,000",
     modelUrl: "/models/frame1.glb",
-    hotspot: { phi: 1.4, theta: -1.2 },
+    // Upper right — wall paintings visible near the bright window area
+    hotspot: { phi: 1.2, theta: 0.7 },
   },
   {
     id: "frame2",
@@ -58,7 +61,8 @@ export const ITEMS = [
     description: "An intimate portrait from the post-war period, rendered in the artist's signature cool palette of prussian blues and muted greys. The subject's direct gaze challenges the viewer while the loose, expressive brushwork speaks to the emotional turbulence of the era. A rare early work.",
     price: "€ 19,800",
     modelUrl: "/models/frame2.glb",
-    hotspot: { phi: 1.4, theta: -2.8 },
+    // Right side — painting on warm stone wall
+    hotspot: { phi: 1.45, theta: 0.9 },
   },
   {
     id: "frame3",
@@ -70,6 +74,7 @@ export const ITEMS = [
     description: "The largest work in the collection, this monumental abstract canvas was created during the artist's New York period under the influence of the Abstract Expressionist movement. Layers of poured paint, gestural marks and collaged newspaper fragments create a rich visual archaeology.",
     price: "€ 87,000",
     modelUrl: "/models/frame3.glb",
-    hotspot: { phi: 1.4, theta: 2.2 },
+    // Center-right — near large circular painting on far wall
+    hotspot: { phi: 1.55, theta: 0.4 },
   },
 ];
