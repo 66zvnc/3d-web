@@ -6,7 +6,7 @@ import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 import { ITEMS } from "./data";
 
 // Local HDRI captured at the gallery
-const PANO_URL = "/9b0d8c08-3792-40a3-9d2a-a136da5b16b2.exr";
+const PANO_URL = "/Untitled.hdr";
 
 function PanoSphere() {
   const [texture, setTexture] = React.useState(null);
