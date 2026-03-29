@@ -1,17 +1,17 @@
 export const ITEMS = [
-  {
-    id: "statue1",
-    name: "The Runner",
-    category: "Sculpture",
-    year: "2nd Century AD",
-    material: "Bronze cast",
-    dimensions: "42 × 18 × 30 cm",
-    description: "A dynamic bronze figure caught mid-stride, embodying speed and athletic grace. The intricate surface detailing reveals the sculptor's mastery of human anatomy in motion. Originally discovered in the ruins of a Roman bathhouse, this piece has become one of the gallery's most prized acquisitions.",
-    price: "€ 24,000",
-    modelUrl: "/models/statue1.glb",
-    // Center of panorama — pedestal visible just right of middle
-    hotspot: { phi: 1.6, theta: -0.3 },
-  },
+  // {
+  //   id: "statue1",
+  //   name: "The Runner",
+  //   category: "Sculpture",
+  //   year: "2nd Century AD",
+  //   material: "Bronze cast",
+  //   dimensions: "42 × 18 × 30 cm",
+  //   description: "A dynamic bronze figure caught mid-stride, embodying speed and athletic grace. The intricate surface detailing reveals the sculptor's mastery of human anatomy in motion. Originally discovered in the ruins of a Roman bathhouse, this piece has become one of the gallery's most prized acquisitions.",
+  //   price: "€ 24,000",
+  //   modelUrl: "/models/statue1.glb",
+  //   // Center of panorama — pedestal visible just right of middle
+  //   hotspot: { phi: 1.2, theta: 0.7 },
+  // },
   {
     id: "statue2",
     name: "Eternal Gaze",
@@ -23,7 +23,7 @@ export const ITEMS = [
     price: "€ 58,000",
     modelUrl: "/models/statue2.glb",
     // Far left wall with arch niches
-    hotspot: { phi: 1.5, theta: -2.5 },
+    hotspot: { phi: 1.55, theta: 0.4 },
   },
   {
     id: "statue3",
@@ -36,7 +36,7 @@ export const ITEMS = [
     price: "€ 31,500",
     modelUrl: "/models/statue3.glb",
     // Center-left near the hanging paintings wall
-    hotspot: { phi: 1.55, theta: -0.8 },
+    hotspot: { phi: 1.57, theta: 2.0 },
   },
   {
     id: "frame1",
@@ -49,7 +49,7 @@ export const ITEMS = [
     price: "€ 42,000",
     modelUrl: "/models/frame1.glb",
     // Upper right — wall paintings visible near the bright window area
-    hotspot: { phi: 1.2, theta: 0.7 },
+      hotspot: { phi: 1.5, theta: -2.9 },
   },
   {
     id: "frame2",
@@ -75,6 +75,6 @@ export const ITEMS = [
     price: "€ 87,000",
     modelUrl: "/models/frame3.glb",
     // Center-right — near large circular painting on far wall
-    hotspot: { phi: 1.55, theta: 0.4 },
+        hotspot: { phi: 1.6, theta: -0.3 },
   },
 ];
