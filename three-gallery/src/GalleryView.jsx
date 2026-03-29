@@ -2,19 +2,24 @@ import React, { useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
+import { RGBELoader } from "three/addons/loaders/RGBELoader.js";
 import { ITEMS } from "./data";
 
-// Equirectangular panorama URLs (free CC0 museum interior from Poly Haven)
-const PANO_URL = "https://dl.polyhaven.org/file/ph-assets/HDRIs/extra/Tonemapped%20JPG/museum_of_ethnography.jpg";
+// Local HDRI captured at the gallery
+const PANO_URL = "/9b0d8c08-3792-40a3-9d2a-a136da5b16b2.exr";
 
 function PanoSphere() {
-  const texture = React.useMemo(() => {
-    const loader = new THREE.TextureLoader();
-    const t = loader.load(PANO_URL);
-    t.mapping = THREE.EquirectangularReflectionMapping;
-    t.colorSpace = THREE.SRGBColorSpace;
-    return t;
+  const [texture, setTexture] = React.useState(null);
+
+  React.useEffect(() => {
+    const loader = new RGBELoader();
+    loader.load(PANO_URL, (t) => {
+      t.mapping = THREE.EquirectangularReflectionMapping;
+      setTexture(t);
+    });
   }, []);
+
+  if (!texture) return null;
 
   return (
     <mesh scale={[-1, 1, 1]}>
