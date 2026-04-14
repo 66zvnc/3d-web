@@ -142,7 +142,7 @@ export default function GalleryView({ onSelectItem }) {
     <div style={{ width: "100vw", height: "100vh", background: "#000", overflow: "hidden", position: "relative" }}>
       {/* Header */}
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, zIndex: 20, padding: "20px 32px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)" }}>
-        <div style={{ color: "#fff", fontWeight: 700, fontSize: 18, letterSpacing: "0.05em" }}>GALLERY PRO</div>
+        <div style={{ color: "#fff", fontWeight: 700, fontSize: 18, letterSpacing: "0.05em" }}>ИНТЕРАКТИВНА КАРТА</div>
         <div style={{ color: "rgba(255,255,255,0.5)", fontSize: 12, letterSpacing: "0.2em", textTransform: "uppercase" }}>Drag to explore · Click items to view</div>
       </div>
 
